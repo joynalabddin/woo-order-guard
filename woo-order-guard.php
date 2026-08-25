@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Order Guard by DevJoynal
  * Plugin URI:  https://devjoynal.com
  * Description: Bangladesh-ready fake, duplicate and multiple-order protection for WooCommerce with phone normalization, IP/email rules, whitelist, styled messages and audit logs.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      Joynal Abdin
  * Author URI:  https://devjoynal.com
  * License:     GPL-2.0-or-later
@@ -18,11 +18,17 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'DJOG_VERSION', '1.1.0' );
-define( 'DJOG_DB_VERSION', '1.1.0' );
+define( 'DJOG_VERSION', '1.2.0' );
+define( 'DJOG_DB_VERSION', '1.2.0' );
 define( 'DJOG_FILE', __FILE__ );
 define( 'DJOG_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DJOG_URL', plugin_dir_url( __FILE__ ) );
+define( 'DJOG_LICENSE_PRODUCT', 'woo-order-guard' );
+define( 'DJOG_LICENSE_API_URL', defined( 'DJOG_CUSTOM_LICENSE_API_URL' ) ? (string) DJOG_CUSTOM_LICENSE_API_URL : '' );
+define( 'DJOG_LICENSE_ITEM_ID', defined( 'DJOG_CUSTOM_LICENSE_ITEM_ID' ) ? (string) DJOG_CUSTOM_LICENSE_ITEM_ID : '' );
+define( 'DJOG_LICENSE_REQUIRED', defined( 'DJOG_CUSTOM_LICENSE_REQUIRED' ) && (bool) DJOG_CUSTOM_LICENSE_REQUIRED );
+
+require_once DJOG_DIR . 'includes/class-djog-license.php';
 
 final class DevJoynal_Woo_Order_Guard {
     private static ?self $instance = null;
@@ -273,7 +279,13 @@ final class DevJoynal_Woo_Order_Guard {
     }
 
     private function should_protect(): bool {
-        return $this->bool_setting( 'enabled' ) && class_exists( 'WooCommerce' );
+        if ( ! $this->bool_setting( 'enabled' ) || ! class_exists( 'WooCommerce' ) ) {
+            return false;
+        }
+        if ( DJOG_LICENSE_REQUIRED && DJOG_LICENSE_API_URL !== '' && ! DevJoynal_DJOG_License::instance()->is_active() ) {
+            return false;
+        }
+        return true;
     }
 
     public function validate_excluded_products_cart(): void {

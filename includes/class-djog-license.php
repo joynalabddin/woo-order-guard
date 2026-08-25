@@ -2,7 +2,7 @@
 /**
  * DevJoynal licensing client for WooCommerce Order Guard.
  *
- * The client talks to a seller-controlled license service. Envato secrets must
+ * The client talks to a seller-controlled license service. Seller secrets must
  * remain on that service and must never be shipped inside the plugin ZIP.
  */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,6 +21,7 @@ final class DevJoynal_DJOG_License {
         add_action( 'admin_menu', [ $this, 'admin_menu' ], 20 );
         add_action( 'admin_notices', [ $this, 'admin_notice' ] );
         add_action( 'admin_post_djog_activate_license', [ $this, 'activate_license' ] );
+        add_action( 'admin_post_djog_enable_free_mode', [ $this, 'enable_free_mode' ] );
         add_action( 'admin_post_djog_deactivate_license', [ $this, 'deactivate_license' ] );
         add_action( 'admin_post_djog_refresh_license', [ $this, 'refresh_license' ] );
         add_action( 'djog_daily_license_check', [ $this, 'scheduled_check' ] );
@@ -55,40 +56,42 @@ final class DevJoynal_DJOG_License {
         }
         $state = $this->state();
         $configured = $this->configured();
+        $free_mode = $this->is_free_mode();
         $message = isset( $_GET['djog_license_message'] ) ? sanitize_text_field( wp_unslash( $_GET['djog_license_message'] ) ) : '';
         $notice_type = 'error' === ( $_GET['djog_license_type'] ?? '' ) ? 'notice-error' : 'notice-success';
         ?>
         <div class="wrap djog-wrap">
-            <div class="djog-header"><div><span class="djog-kicker">DEVJOYNAL LICENSE</span><h1>Product license</h1><p>Activate this installation with an Envato Market purchase code.</p></div><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=djog-dashboard' ) ); ?>">View dashboard</a></div>
+            <div class="djog-header"><div><span class="djog-kicker">DEVJOYNAL LICENSE</span><h1>Product license</h1><p>Choose Free/Demo mode or activate a paid product key.</p></div><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=djog-dashboard' ) ); ?>">View dashboard</a></div>
             <?php if ( $message ) : ?><div class="notice <?php echo esc_attr( $notice_type ); ?> is-dismissible"><p><?php echo esc_html( $message ); ?></p></div><?php endif; ?>
             <div class="djog-grid">
                 <div class="djog-panel">
                     <h2>License status</h2>
                     <div class="djog-license-status <?php echo esc_attr( $this->status_class( $state ) ); ?>"><strong><?php echo esc_html( $this->status_label( $state ) ); ?></strong><span><?php echo esc_html( $state['message'] ?: 'No license has been activated on this site.' ); ?></span></div>
                     <dl class="djog-license-meta"><dt>Product</dt><dd><?php echo esc_html( DJOG_LICENSE_PRODUCT ); ?></dd><dt>Domain</dt><dd><?php echo esc_html( $state['domain'] ?: $this->domain() ); ?></dd><dt>Last checked</dt><dd><?php echo esc_html( $state['last_checked'] ?: 'Never' ); ?></dd><dt>Activation limit</dt><dd><?php echo esc_html( $state['activation_limit'] ?: 'Configured by license service' ); ?></dd></dl>
-                    <?php if ( ! $configured ) : ?><p class="description">License service is not configured yet. Define <code>DJOG_LICENSE_API_URL</code> and <code>DJOG_LICENSE_ITEM_ID</code> in <code>wp-config.php</code> before activating customer licenses.</p><?php endif; ?>
+                    <?php if ( $free_mode ) : ?><p class="description">Free/Demo mode is active on this domain. No product key is required.</p><?php elseif ( ! $configured ) : ?><p class="description">Paid license service is not configured. You can use Free/Demo mode now, or define <code>DJOG_CUSTOM_LICENSE_API_URL</code> and <code>DJOG_CUSTOM_LICENSE_PRODUCT_ID</code> in <code>wp-config.php</code> for paid activation.</p><?php endif; ?>
                 </div>
                 <div class="djog-panel">
-                    <h2>Activate with purchase code</h2>
-                    <p>Use the purchase code from Envato Downloads → Licence certificate &amp; purchase code. The raw code is encrypted at rest and is never displayed after saving.</p>
+                    <h2>Product activation</h2>
+                    <p>Use the product key issued by your seller. The raw key is encrypted at rest and is never displayed after saving.</p>
                     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                         <input type="hidden" name="action" value="djog_activate_license">
                         <?php wp_nonce_field( 'djog_activate_license' ); ?>
-                        <label class="djog-field">Envato purchase code<input type="password" name="purchase_code" autocomplete="off" required placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></label>
-                        <button class="button button-primary button-large" type="submit" <?php disabled( ! $configured ); ?>>Activate license</button>
+                        <label class="djog-field">Product license key<input type="password" name="purchase_code" autocomplete="off" required placeholder="XXXX-XXXX-XXXX-XXXX"></label>
+                        <button class="button button-primary button-large" type="submit" <?php disabled( ! $configured ); ?>>Activate paid license</button>
                     </form>
-                    <?php if ( $this->has_purchase_code() ) : ?>
+                    <?php if ( ! $free_mode && $this->has_purchase_code() ) : ?>
                         <div class="djog-license-actions"><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_refresh_license' ), 'djog_refresh_license' ) ); ?>">Refresh status</a> <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_deactivate_license' ), 'djog_deactivate_license' ) ); ?>" onclick="return confirm('Deactivate this site license?');">Deactivate site</a></div>
                     <?php endif; ?>
+                    <div class="djog-license-actions"><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="djog_enable_free_mode"><?php wp_nonce_field( 'djog_enable_free_mode' ); ?><button class="button" type="submit">Use Free/Demo mode</button></form></div>
                 </div>
             </div>
-            <div class="djog-panel"><h2>How licensing works</h2><p>The plugin sends only the purchase code, product identifier, current domain and version to your configured seller license service. Envato API credentials stay on that service. If the license service is temporarily unavailable, the plugin keeps the last active state during the configured grace period and never makes checkout depend on a live remote request.</p><p class="djog-footer">Developer: <strong>Joynal Abdin</strong> · <a href="https://devjoynal.com" target="_blank" rel="noopener">DevJoynal</a></p></div>
+            <div class="djog-panel"><h2>How licensing works</h2><p>Free/Demo mode activates the plugin locally without a product key. Paid mode sends only the product key, product identifier, current domain and version to your configured seller license service. Seller secrets stay on that service. If the license service is temporarily unavailable, the plugin keeps the last active state during the configured grace period and never makes checkout depend on a live remote request.</p><p class="djog-footer">Developer: <strong>Joynal Abdin</strong> · <a href="https://devjoynal.com" target="_blank" rel="noopener">DevJoynal</a></p></div>
         </div>
         <?php
     }
 
     public function admin_notice(): void {
-        if ( ! current_user_can( 'manage_woocommerce' ) || ! $this->configured() || $this->is_active() || wp_doing_ajax() ) {
+        if ( ! current_user_can( 'manage_woocommerce' ) || ! $this->configured() || ! DJOG_LICENSE_REQUIRED || $this->is_active() || $this->is_free_mode() || wp_doing_ajax() ) {
             return;
         }
         echo '<div class="notice notice-warning"><p><strong>WooCommerce Order Guard:</strong> license is not active for this site. <a href="' . esc_url( admin_url( 'admin.php?page=djog-license' ) ) . '">Open License settings</a>.</p></div>';
@@ -97,11 +100,30 @@ final class DevJoynal_DJOG_License {
     public function activate_license(): void {
         $this->guard_request( 'djog_activate_license' );
         $purchase_code = sanitize_text_field( wp_unslash( $_POST['purchase_code'] ?? '' ) );
-        if ( ! preg_match( '/^[a-z0-9-]{20,80}$/i', $purchase_code ) ) {
-            $this->redirect( 'Enter a valid Envato purchase code.', 'error' );
+        if ( ! preg_match( '/^[a-z0-9-]{8,128}$/i', $purchase_code ) ) {
+            $this->redirect( 'Enter a valid product license key.', 'error' );
         }
         $result = $this->request( 'activate', $purchase_code );
         $this->redirect( $result['message'], $result['success'] ? 'success' : 'error' );
+    }
+
+    public function enable_free_mode(): void {
+        $this->guard_request( 'djog_enable_free_mode' );
+        $current_key = $this->decrypt( (string) ( $this->state()['encrypted_purchase_code'] ?? '' ) );
+        if ( $current_key !== '' && $this->configured() ) {
+            $this->request( 'deactivate', $current_key );
+        }
+        $this->update_state( [
+            'status' => 'free',
+            'mode' => 'free',
+            'message' => 'Free/Demo mode is active on this domain.',
+            'domain' => $this->domain(),
+            'last_checked' => current_time( 'mysql', true ),
+            'expires_at' => '',
+            'encrypted_purchase_code' => '',
+            'license_hash' => '',
+        ] );
+        $this->redirect( 'Free/Demo mode is now active. No license key is required.', 'success' );
     }
 
     public function deactivate_license(): void {
@@ -138,9 +160,8 @@ final class DevJoynal_DJOG_License {
             'body' => wp_json_encode( [
                 'api_version' => '1',
                 'action' => $action,
-                'product_id' => DJOG_LICENSE_PRODUCT,
-                'item_id' => DJOG_LICENSE_ITEM_ID,
-                'purchase_code' => $purchase_code,
+                'product_id' => DJOG_LICENSE_PRODUCT_ID,
+                'license_key' => $purchase_code,
                 'domain' => $this->domain(),
                 'site_url' => home_url( '/' ),
                 'plugin_version' => DJOG_VERSION,
@@ -215,20 +236,22 @@ final class DevJoynal_DJOG_License {
         return ( $state['status'] ?? '' ) === 'active' && ( empty( $state['expires_at'] ) || strtotime( (string) $state['expires_at'] ) > time() );
     }
 
-    private function is_active_legacy(): bool {
-        $state = $this->state();
-        return ( $state['status'] ?? '' ) === 'active' && ( empty( $state['expires_at'] ) || strtotime( (string) $state['expires_at'] ) > time() );
+    public function is_free_mode(): bool {
+        return ( $this->state()['mode'] ?? '' ) === 'free' || ( $this->state()['status'] ?? '' ) === 'free';
     }
 
     private function status_label( array $state ): string {
         if ( $this->is_active() ) {
             return 'Active';
         }
+        if ( $this->is_free_mode() ) {
+            return 'Free/Demo';
+        }
         return ucfirst( sanitize_key( $state['status'] ?? 'inactive' ) );
     }
 
     private function status_class( array $state ): string {
-        return $this->is_active() ? 'is-active' : ( ( $state['status'] ?? '' ) === 'unknown' ? 'is-unknown' : 'is-inactive' );
+        return $this->is_active() || $this->is_free_mode() ? 'is-active' : ( ( $state['status'] ?? '' ) === 'unknown' ? 'is-unknown' : 'is-inactive' );
     }
 
     private function domain(): string {

@@ -14,7 +14,7 @@ Whitelisted phone numbers এক লাইনে একটি করে দি�
 
 ## Customer message design
 
-Duplicate/fake order message-এ `{{window}}` দিয়ে configured block window, `{{reason}}` দিয়ে matching signal, এবং `{{phone}}` দিয়ে normalized phone value বসে। Customer privacy রক্ষার জন্য production message-এ full phone number দেখানোর বদলে generic message ব্যবহার করার পরামর্শ দেওয়া হয়। উদাহরণ:
+Duplicate/fake order message-এ `{{window}}` দিয়ে configured block window, `{{reason}}` দিয়ে matching signal, এবং `{{phone}}` দিয়ে normalized phone value বসে। Customer privacy রক্ষার জন্য production message-এ full phone number দেখানোর বদলে generic message ব্যবহার করার পরামর্শ দেওয়া হয়।
 
 ```text
 দুঃখিত, এই তথ্য দিয়ে সাম্প্রতিক একটি অর্ডার পাওয়া গেছে। অনুগ্রহ করে {{window}} মিনিট পরে চেষ্টা করুন অথবা আমাদের সাথে যোগাযোগ করুন।
@@ -32,11 +32,13 @@ Dashboard-এর **Total blocked** সব masked event-এর সংখ্যা
 
 যে product online checkout-এর জন্য temporarily unavailable, preorder-only, phone-confirmation-only অথবা restricted, তার product ID **Excluded product IDs**-এ দিন। Comma অথবা নতুন line দিয়ে একাধিক ID দেওয়া যায়। Product catalog visibility থেকে hide করার পাশাপাশি cart checkout-এ error দেওয়া হয়। Variation product হলে parent ও relevant variation ID business flow অনুযায়ী যাচাই করুন।
 
-## License page
+## License modes
 
-Envato/CodeCanyon customer-এর জন্য **Order Guard → License** page-এ purchase code activation করা হয়। Purchase code Envato Downloads-এর licence certificate-এ পাওয়া যায়। License service configure না থাকলে activation button disabled থাকবে এবং core protection license enforcement ছাড়া চলবে। Paid deployment-এ seller API configure করার পর `DJOG_CUSTOM_LICENSE_REQUIRED` `true` করা যায়।
+Pluginটি Envato-এর বাইরে direct sales বা agency sales-এর জন্য দুইটি mode দেয়। **Free/Demo mode**-এ কোনো license key লাগে না; official site, development বা demo store-এ **Order Guard → License → Use Free/Demo mode** চাপুন।
 
-License service temporary unavailable হলে cached active state-এর 14-day grace period থাকতে পারে। Domain change, staging migration বা one-domain conflict হলে seller reset policy অনুসরণ করুন; customer-side plugin থেকে Envato registration bypass করা যাবে না।
+**Paid mode**-এ আপনার seller license server থেকে issue করা product key লাগে। Customer **Order Guard → License** খুলে key paste করে **Activate paid license** চাপবে। Product key encrypted local option-এ রাখা হয় এবং seller API current domain, product ID ও plan/expiry অনুযায়ী activation status ফেরত দেয়।
+
+Paid edition-এর জন্য seller API configure করার পরে `DJOG_CUSTOM_LICENSE_REQUIRED` `true` করুন। Lifetime plan-এ expiry না থাকলেও activation limit থাকতে পারে; lifetime মানে unlimited domain নয়। Domain migration বা reset seller dashboard-এর controlled policy অনুযায়ী করুন।
 
 ## Recommended maintenance
 
@@ -52,5 +54,5 @@ License service temporary unavailable হলে cached active state-এর 14-da
 | Signals | Phone/email/IP business context অনুযায়ী |
 | Whitelist | Verified customers only |
 | Retention | Privacy notice-এর সঙ্গে সামঞ্জস্যপূর্ণ |
-| License | Production seller API configured হলে active |
+| License | Free/Demo অথবা active paid key |
 | Logs | Masked, exportable, periodically cleaned |

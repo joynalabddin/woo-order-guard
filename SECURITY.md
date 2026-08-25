@@ -26,14 +26,14 @@ Suspected vulnerability public GitHub issue-এ প্রকাশ করবে�
 
 Admin actions capability check এবং WordPress nonce দিয়ে protected। Dynamic database values prepared query-তে যায়। Checkout logs-এ phone, email এবং IPv4 masked করা হয়। Retention cleanup পুরোনো records সরায়। Privacy exporter ও eraser WordPress Privacy Tools-এর সঙ্গে যুক্ত। Customer-facing output context অনুযায়ী escaped।
 
-License client-এর Envato Personal Token, OAuth client secret বা seller credential customer plugin-এ থাকে না। Purchase code encrypted local option-এ রাখা হয় এবং seller service HTTPS endpoint-এ verify করে। Seller license service-এ request authentication, item ID validation, one-domain activation, rate limiting এবং audit trail থাকা উচিত।
+License client-এর seller signing secret বা private API credential customer plugin-এ থাকে না। Product key encrypted local option-এ রাখা হয় এবং seller service HTTPS endpoint-এ verify করে। Seller license service-এ request authentication, product ID validation, activation-limit policy, rate limiting এবং audit trail থাকা উচিত।
 
 ## Secret handling
 
 কখনো repository-তে commit করবেন না:
 
-- Envato Personal Token বা OAuth secret
-- Real purchase code
+- Seller signing secret বা private API credential
+- Real product key
 - WordPress admin credential
 - Seller API private key
 - Customer export বা production database

@@ -2,12 +2,19 @@
 
 এই project-এর গুরুত্বপূর্ণ পরিবর্তনগুলো এখানে সংরক্ষিত হয়। Versioning semantic release style অনুসরণ করে।
 
-## [1.2.0] — Envato licensing client
+## [1.3.0] — Flexible independent licensing
 
-- Envato/CodeCanyon customer-side purchase-code license UI যোগ করা হয়েছে।
+- License key ছাড়াই local Free/Demo mode activation যোগ করা হয়েছে।
+- Seller-issued paid product-key activation flow যোগ হয়েছে।
+- Product ID ও domain-bound seller API contract আপডেট হয়েছে।
+- Lifetime plan ও founder access-এর security guidance যোগ হয়েছে।
+
+## [1.2.0] — Independent licensing client
+
+- Customer-side paid product-key license UI যোগ করা হয়েছে।
 - Activation, status refresh এবং site deactivation action যোগ হয়েছে।
 - Current domain, product ID, item ID এবং plugin version seller service-এ পাঠানোর contract যুক্ত হয়েছে।
-- Purchase code local option-এ encrypted অবস্থায় রাখা হয়েছে; raw code admin screen-এ দেখানো হয় না।
+- Product key local option-এ encrypted অবস্থায় রাখা হয়েছে; raw key admin screen-এ দেখানো হয় না।
 - Remote service outage-এর জন্য 14-day active grace period যুক্ত হয়েছে।
 - Daily license status check এবং license-required enforcement flag যুক্ত হয়েছে।
 - `LICENSE-SETUP.md` এবং seller API contract documentation যোগ হয়েছে।

@@ -15,7 +15,7 @@ node --check assets/frontend.js
 git diff --check
 ```
 
-Real customer data, production credentials, Envato purchase code, Envato token, OAuth secret, private license endpoint বা generated database export commit করা যাবে না। ZIP build-এ `.git` directory বাদ দিতে হবে এবং top-level directory `woo-order-guard` রাখতে হবে।
+Real customer data, production credentials, seller product key, signing secret, private license endpoint বা generated database export commit করা যাবে না। ZIP build-এ `.git` directory বাদ দিতে হবে এবং top-level directory `woo-order-guard` রাখতে হবে।
 
 ## Review expectations
 

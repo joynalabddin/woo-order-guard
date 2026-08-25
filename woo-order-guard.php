@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Order Guard by DevJoynal
  * Plugin URI:  https://devjoynal.com
  * Description: Bangladesh-ready fake, duplicate and multiple-order protection for WooCommerce with phone normalization, IP/email rules, whitelist, styled messages and audit logs.
- * Version:     1.0.2
+ * Version:     1.1.0
  * Author:      Joynal Abdin
  * Author URI:  https://devjoynal.com
  * License:     GPL-2.0-or-later

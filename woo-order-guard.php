@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Order Guard by DevJoynal
  * Plugin URI:  https://devjoynal.com
  * Description: Bangladesh-ready fake, duplicate and multiple-order protection for WooCommerce with phone normalization, IP/email rules, whitelist, styled messages and audit logs.
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      Joynal Abdin
  * Author URI:  https://devjoynal.com
  * License:     GPL-2.0-or-later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'DJOG_VERSION', '1.0.1' );
+define( 'DJOG_VERSION', '1.0.2' );
 define( 'DJOG_DB_VERSION', '1.0.0' );
 define( 'DJOG_FILE', __FILE__ );
 define( 'DJOG_DIR', plugin_dir_path( __FILE__ ) );
@@ -60,6 +60,7 @@ final class DevJoynal_Woo_Order_Guard {
         add_filter( 'wp_privacy_personal_data_exporters', [ $this, 'register_exporter' ] );
         add_filter( 'wp_privacy_personal_data_erasers', [ $this, 'register_eraser' ] );
         add_filter( 'rest_request_before_callbacks', [ $this, 'validate_store_api_request' ], 10, 3 );
+        add_filter( 'rest_pre_dispatch', [ $this, 'validate_store_api_pre_dispatch' ], 10, 3 );
     }
 
     public function declare_hpos_compatibility(): void {
@@ -203,6 +204,26 @@ final class DevJoynal_Woo_Order_Guard {
             return;
         }
         $this->validate_payload( $data, $errors );
+    }
+
+    public function validate_store_api_pre_dispatch( $response, WP_REST_Server $server, WP_REST_Request $request ) {
+        if ( ! $this->should_protect() || 'POST' !== strtoupper( $request->get_method() ) || ! preg_match( '#^/wc/store/v[0-9]+/checkout$#', $request->get_route() ) ) {
+            return $response;
+        }
+
+        $params  = $request->get_json_params();
+        $params  = is_array( $params ) && ! empty( $params ) ? $params : $request->get_params();
+        $billing = is_array( $params['billing_address'] ?? null ) ? $params['billing_address'] : [];
+        $errors  = new WP_Error();
+        $this->validate_payload(
+            [
+                'billing_phone' => (string) ( $billing['phone'] ?? $params['billing_phone'] ?? '' ),
+                'billing_email' => (string) ( $billing['email'] ?? $params['billing_email'] ?? '' ),
+            ],
+            $errors
+        );
+
+        return $errors->has_errors() ? $errors : $response;
     }
 
     public function validate_store_api_request( $response, array $handler, WP_REST_Request $request ) {

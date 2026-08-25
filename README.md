@@ -21,7 +21,7 @@ The target baseline is WordPress 7.0 or newer with PHP 8.3 or newer. The plugin 
 
 ## Release notes
 
-Version 1.0.1 adds a defensive Store API request filter and WooCommerce Blocks validation-store integration so invalid phone values cannot proceed to order creation when the site uses the block-based Checkout page.
+Version 1.0.2 adds a Store API pre-dispatch guard plus a visible Block Checkout alert, ensuring invalid phone values are rejected before order creation and the shopper sees the configured message.
 
 ## Installation
 

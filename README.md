@@ -6,7 +6,7 @@
 
 The plugin validates Bangladesh mobile numbers, normalizes common formats such as `017XXXXXXXX` and `+88017XXXXXXXX`, and checks recent WooCommerce orders against configurable phone, email and customer-IP signals. Store owners can define the protection window, counted order statuses, maximum matching orders, trusted phone numbers and trusted email addresses. When a checkout is blocked, the customer sees a configurable message with a styled shield presentation.
 
-The admin area includes a dashboard, masked security logs, CSV export, log clearing, settings for protection signals, custom messages, colors, radius and font size, and a live message preview. The plugin declares compatibility with WooCommerce High-Performance Order Storage and supports classic checkout validation plus the WooCommerce Store API checkout error hook when available.
+The admin area includes a dashboard, masked security logs, CSV export, log clearing, settings for protection signals, custom messages, colors, radius and font size, and a live message preview. The plugin declares compatibility with WooCommerce High-Performance Order Storage and supports classic checkout validation plus WooCommerce Block Checkout validation through the Store API request pipeline and the Blocks validation store.
 
 ## Requirements
 
@@ -18,6 +18,10 @@ The admin area includes a dashboard, masked security logs, CSV export, log clear
 | License | GPL-2.0-or-later |
 
 The target baseline is WordPress 7.0 or newer with PHP 8.3 or newer. The plugin does not replace WordPress or WooCommerce; those components should be updated from the site's normal update screen.
+
+## Release notes
+
+Version 1.0.1 adds a defensive Store API request filter and WooCommerce Blocks validation-store integration so invalid phone values cannot proceed to order creation when the site uses the block-based Checkout page.
 
 ## Installation
 

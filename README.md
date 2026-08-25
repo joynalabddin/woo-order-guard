@@ -12,12 +12,12 @@ The admin area includes a dashboard, masked security logs, CSV export, log clear
 
 | Component | Supported baseline |
 |---|---|
-| WordPress | 6.8 or newer |
-| PHP | 8.1 or newer |
+| WordPress | 7.0 or newer |
+| PHP | 8.3 or newer |
 | WooCommerce | 9.x or newer |
 | License | GPL-2.0-or-later |
 
-The target platform is WordPress 7.1 with a current PHP 8.x runtime. The plugin does not replace WordPress or WooCommerce; those components should be updated from the site's normal update screen.
+The target baseline is WordPress 7.0 or newer with PHP 8.3 or newer. The plugin does not replace WordPress or WooCommerce; those components should be updated from the site's normal update screen.
 
 ## Installation
 

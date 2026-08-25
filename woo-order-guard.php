@@ -8,8 +8,8 @@
  * Author URI:  https://devjoynal.com
  * License:     GPL-2.0-or-later
  * Update URI:  https://github.com/joynalabddin/woo-order-guard
- * Requires PHP: 8.1
- * Requires at least: 6.8
+ * Requires PHP: 8.3
+ * Requires at least: 7.0
  * Requires Plugins: woocommerce
  * Text Domain: woo-order-guard
  */

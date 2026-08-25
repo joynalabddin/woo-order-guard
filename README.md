@@ -6,7 +6,7 @@
 
 The plugin validates Bangladesh mobile numbers, normalizes common formats such as `017XXXXXXXX` and `+88017XXXXXXXX`, and checks recent WooCommerce orders against configurable phone, email and customer-IP signals. Store owners can define the protection window, counted order statuses, maximum matching orders, trusted phone numbers and trusted email addresses. When a checkout is blocked, the customer sees a configurable message with a styled shield presentation.
 
-The admin area includes a dashboard, masked security logs, CSV export, log clearing, settings for protection signals, custom messages, colors, radius and font size, and a live message preview. The plugin declares compatibility with WooCommerce High-Performance Order Storage and supports classic checkout validation plus WooCommerce Block Checkout validation through the Store API request pipeline and the Blocks validation store.
+The admin area includes a dashboard, masked security logs, CSV export, log clearing, seven-day and thirty-day reason analytics, manual retention cleanup, settings for protection signals, custom messages, colors, radius and font size, and a live message preview. The plugin declares compatibility with WooCommerce High-Performance Order Storage and supports classic checkout validation plus WooCommerce Block Checkout validation through the Store API request pipeline and the Blocks validation store. Administrators can also configure retry cooldowns and exclude selected product IDs from catalog visibility and checkout.
 
 ## Requirements
 
@@ -21,7 +21,7 @@ The target baseline is WordPress 7.0 or newer with PHP 8.3 or newer. The plugin 
 
 ## Release notes
 
-Version 1.0.2 adds a Store API pre-dispatch guard plus a visible Block Checkout alert, ensuring invalid phone values are rejected before order creation and the shopper sees the configured message.
+Version 1.1.0 adds configurable blocked-retry cooldowns, daily masked-log retention cleanup, manual cleanup, seven-day/thirty-day dashboard analytics, excluded-product enforcement, a real frontend stylesheet, and additional responsive admin cards. The earlier Store API pre-dispatch guard and visible Block Checkout alert remain active.
 
 ## Installation
 
@@ -31,7 +31,7 @@ For a ZIP installation, create a ZIP whose top-level directory is `woo-order-gua
 
 ## Privacy and security
 
-The plugin stores only masked phone, email and IPv4 values in its security log. It does not send checkout data to DevJoynal, GitHub or another external service. Administrators should configure a retention policy appropriate to their privacy notice and should use WordPress's Privacy Tools when responding to data requests. All admin actions use capability checks and WordPress nonces, database writes use `$wpdb` placeholders or APIs, and customer-facing data is escaped before output.
+The plugin stores only masked phone, email and IPv4 values in its security log. It does not send checkout data to DevJoynal, GitHub or another external service. Administrators should configure the retention period and retry cooldown appropriate to their privacy notice and operations, and should use WordPress's Privacy Tools when responding to data requests. A daily WordPress cron task removes records older than the configured retention period. All admin actions use capability checks and WordPress nonces, database writes use `$wpdb` placeholders or APIs, and customer-facing data is escaped before output.
 
 ## Developer branding
 

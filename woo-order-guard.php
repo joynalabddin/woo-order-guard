@@ -18,8 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'DJOG_VERSION', '1.0.2' );
-define( 'DJOG_DB_VERSION', '1.0.0' );
+define( 'DJOG_VERSION', '1.1.0' );
+define( 'DJOG_DB_VERSION', '1.1.0' );
 define( 'DJOG_FILE', __FILE__ );
 define( 'DJOG_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DJOG_URL', plugin_dir_url( __FILE__ ) );
@@ -42,6 +42,7 @@ final class DevJoynal_Woo_Order_Guard {
 
         add_action( 'before_woocommerce_init', [ $this, 'declare_hpos_compatibility' ] );
         add_action( 'admin_init', [ $this, 'maybe_upgrade' ] );
+        add_action( 'djog_daily_cleanup', [ $this, 'cleanup_logs' ] );
         add_action( 'admin_menu', [ $this, 'admin_menu' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'admin_assets' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'frontend_assets' ] );
@@ -50,6 +51,7 @@ final class DevJoynal_Woo_Order_Guard {
 
         add_action( 'admin_post_djog_save_settings', [ $this, 'save_settings' ] );
         add_action( 'admin_post_djog_clear_logs', [ $this, 'clear_logs' ] );
+        add_action( 'admin_post_djog_cleanup_logs', [ $this, 'manual_cleanup_logs' ] );
         add_action( 'admin_post_djog_export_logs', [ $this, 'export_logs' ] );
 
         add_action( 'woocommerce_after_checkout_validation', [ $this, 'validate_classic_checkout' ], 10, 2 );
@@ -61,6 +63,8 @@ final class DevJoynal_Woo_Order_Guard {
         add_filter( 'wp_privacy_personal_data_erasers', [ $this, 'register_eraser' ] );
         add_filter( 'rest_request_before_callbacks', [ $this, 'validate_store_api_request' ], 10, 3 );
         add_filter( 'rest_pre_dispatch', [ $this, 'validate_store_api_pre_dispatch' ], 10, 3 );
+        add_filter( 'woocommerce_product_is_visible', [ $this, 'respect_product_visibility' ], 10, 2 );
+        add_action( 'woocommerce_check_cart_items', [ $this, 'validate_excluded_products_cart' ] );
     }
 
     public function declare_hpos_compatibility(): void {
@@ -73,10 +77,20 @@ final class DevJoynal_Woo_Order_Guard {
         $this->create_table();
         update_option( 'djog_db_version', DJOG_DB_VERSION, false );
         update_option( $this->option, wp_parse_args( get_option( $this->option, [] ), $this->defaults() ), false );
+        if ( ! wp_next_scheduled( 'djog_daily_cleanup' ) ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'djog_daily_cleanup' );
+        }
     }
 
     public function deactivate(): void {
         wp_clear_scheduled_hook( 'djog_daily_cleanup' );
+    }
+
+    public function cleanup_logs(): void {
+        global $wpdb;
+        $days = max( 1, min( 3650, absint( $this->settings()['log_retention_days'] ?? 90 ) ) );
+        $cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
+        $wpdb->query( $wpdb->prepare( "DELETE FROM {$this->table} WHERE created_at < %s", $cutoff ) );
     }
 
     public function maybe_upgrade(): void {
@@ -130,6 +144,8 @@ final class DevJoynal_Woo_Order_Guard {
             'border_radius'        => 12,
             'font_size'            => 15,
             'log_retention_days'   => 90,
+            'blocked_retry_cooldown' => 60,
+            'excluded_product_ids' => '',
         ];
     }
 
@@ -260,6 +276,31 @@ final class DevJoynal_Woo_Order_Guard {
         return $this->bool_setting( 'enabled' ) && class_exists( 'WooCommerce' );
     }
 
+    public function validate_excluded_products_cart(): void {
+        if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+            return;
+        }
+        foreach ( WC()->cart->get_cart() as $item ) {
+            $product_id = absint( $item['variation_id'] ?? $item['product_id'] ?? 0 );
+            if ( $this->is_product_excluded( $product_id ) ) {
+                wc_add_notice( esc_html__( 'This product is temporarily unavailable for online checkout.', 'woo-order-guard' ), 'error' );
+                break;
+            }
+        }
+    }
+
+    public function respect_product_visibility( $visible, $product ): bool {
+        if ( ! $visible || ! $product instanceof WC_Product || ! $this->is_product_excluded( $product->get_id() ) ) {
+            return (bool) $visible;
+        }
+        return false;
+    }
+
+    private function is_product_excluded( int $product_id ): bool {
+        $ids = preg_split( '/[\\s,]+/', (string) ( $this->settings()['excluded_product_ids'] ?? '' ) ) ?: [];
+        return in_array( $product_id, array_map( 'absint', array_filter( $ids ) ), true );
+    }
+
     private function validate_payload( array $data, WP_Error $errors ): void {
         $phone = $this->normalize_phone( (string) ( $data['billing_phone'] ?? $data['phone'] ?? $data['shipping_phone'] ?? '' ) );
         $email = strtolower( sanitize_email( (string) ( $data['billing_email'] ?? $data['email'] ?? '' ) ) );
@@ -271,6 +312,12 @@ final class DevJoynal_Woo_Order_Guard {
         }
 
         if ( $this->is_whitelisted( $phone, $email ) ) {
+            return;
+        }
+
+        $cooldown_key = $this->cooldown_key( $phone, $email, $ip );
+        if ( get_transient( 'djog_cooldown_' . $cooldown_key ) ) {
+            $this->add_checkout_error( $errors, 'Too many recent checkout attempts. Please wait a moment and try again.', 'rate_limit', $phone, $email, $ip );
             return;
         }
 
@@ -293,6 +340,14 @@ final class DevJoynal_Woo_Order_Guard {
         $display = '<div class="djog-checkout-error"><span class="djog-checkout-error__icon" aria-hidden="true">🛡</span>' . wp_kses_post( $message ) . '</div>';
         $errors->add( 'djog_' . sanitize_key( $reason ), $display );
         $this->log_event( $reason, $phone, $email, $ip );
+        $cooldown = max( 0, min( HOUR_IN_SECONDS, absint( $this->settings()['blocked_retry_cooldown'] ?? 60 ) ) );
+        if ( $cooldown > 0 ) {
+            set_transient( 'djog_cooldown_' . $this->cooldown_key( $phone, $email, $ip ), 1, $cooldown );
+        }
+    }
+
+    private function cooldown_key( string $phone, string $email, string $ip ): string {
+        return hash( 'sha256', $phone . '|' . $email . '|' . $ip );
     }
 
     private function valid_bd_phone( string $phone ): bool {
@@ -421,6 +476,16 @@ final class DevJoynal_Woo_Order_Guard {
         return $ip !== '' ? 'masked' : '';
     }
 
+    public function manual_cleanup_logs(): void {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( esc_html__( 'Unauthorized.', 'woo-order-guard' ), 403 );
+        }
+        check_admin_referer( 'djog_cleanup_logs' );
+        $this->cleanup_logs();
+        wp_safe_redirect( admin_url( 'admin.php?page=djog-dashboard&cleaned=1' ) );
+        exit;
+    }
+
     public function dashboard_page(): void {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_die( esc_html__( 'You do not have permission to view this page.', 'woo-order-guard' ) );
@@ -429,10 +494,13 @@ final class DevJoynal_Woo_Order_Guard {
         $total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table}" );
         $today = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$this->table} WHERE created_at >= %s", gmdate( 'Y-m-d 00:00:00' ) ) );
         $rows = $wpdb->get_results( "SELECT * FROM {$this->table} ORDER BY id DESC LIMIT 50" );
+        $week = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$this->table} WHERE created_at >= %s", gmdate( 'Y-m-d H:i:s', time() - ( 7 * DAY_IN_SECONDS ) ) ) );
+        $reasons = $wpdb->get_results( $wpdb->prepare( "SELECT reason, COUNT(*) AS total FROM {$this->table} WHERE created_at >= %s GROUP BY reason ORDER BY total DESC", gmdate( 'Y-m-d H:i:s', time() - ( 30 * DAY_IN_SECONDS ) ) ) );
         ?>
         <div class="wrap djog-wrap">
             <div class="djog-header"><div><span class="djog-kicker">DEVJOYNAL SECURITY</span><h1>WooCommerce Order Guard</h1><p>Fake, duplicate and multiple-order protection for modern WooCommerce stores.</p></div><a class="button button-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=djog-settings' ) ); ?>">Protection settings</a></div>
-            <div class="djog-cards"><div class="djog-card"><span>Total blocked</span><strong><?php echo esc_html( number_format_i18n( $total ) ); ?></strong></div><div class="djog-card"><span>Blocked today</span><strong><?php echo esc_html( number_format_i18n( $today ) ); ?></strong></div><div class="djog-card"><span>Protection</span><strong class="djog-status <?php echo $this->bool_setting( 'enabled' ) ? 'is-on' : 'is-off'; ?>"><?php echo $this->bool_setting( 'enabled' ) ? 'Active' : 'Paused'; ?></strong></div></div>
+            <div class="djog-cards"><div class="djog-card"><span>Total blocked</span><strong><?php echo esc_html( number_format_i18n( $total ) ); ?></strong></div><div class="djog-card"><span>Blocked today</span><strong><?php echo esc_html( number_format_i18n( $today ) ); ?></strong></div><div class="djog-card"><span>Last 7 days</span><strong><?php echo esc_html( number_format_i18n( $week ) ); ?></strong></div><div class="djog-card"><span>Protection</span><strong class="djog-status <?php echo $this->bool_setting( 'enabled' ) ? 'is-on' : 'is-off'; ?>"><?php echo $this->bool_setting( 'enabled' ) ? 'Active' : 'Paused'; ?></strong></div></div>
+            <div class="djog-panel"><div class="djog-panel-heading"><div><h2>Security analytics</h2><p>Recent protection activity grouped by reason.</p></div><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_cleanup_logs' ), 'djog_cleanup_logs' ) ); ?>">Run retention cleanup</a></div><div class="djog-reason-grid"><?php if ( empty( $reasons ) ) : ?><p>No blocked events in the last 30 days.</p><?php else : foreach ( $reasons as $reason_row ) : ?><div class="djog-reason-card"><span><?php echo esc_html( ucfirst( str_replace( '_', ' ', $reason_row->reason ) ) ); ?></span><strong><?php echo esc_html( number_format_i18n( (int) $reason_row->total ) ); ?></strong></div><?php endforeach; endif; ?></div></div>
             <div class="djog-panel"><div class="djog-panel-heading"><div><h2>Security log</h2><p>Personal identifiers are masked before storage.</p></div><div><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_export_logs' ), 'djog_export_logs' ) ); ?>">Export CSV</a> <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_clear_logs' ), 'djog_clear_logs' ) ); ?>" onclick="return confirm('Clear all security logs?');">Clear logs</a></div></div>
             <table class="widefat striped djog-table"><thead><tr><th>Date (UTC)</th><th>Reason</th><th>Phone</th><th>Email</th><th>IP</th></tr></thead><tbody>
             <?php if ( empty( $rows ) ) : ?><tr><td colspan="5">No blocked checkout attempts have been recorded yet.</td></tr><?php else : foreach ( $rows as $row ) : ?><tr><td><?php echo esc_html( $row->created_at ); ?></td><td><span class="djog-badge"><?php echo esc_html( ucfirst( $row->reason ) ); ?></span></td><td><?php echo esc_html( $row->phone ); ?></td><td><?php echo esc_html( $row->email ); ?></td><td><?php echo esc_html( $row->ip_address ); ?></td></tr><?php endforeach; endif; ?>
@@ -450,9 +518,9 @@ final class DevJoynal_Woo_Order_Guard {
         ?>
         <div class="wrap djog-wrap"><div class="djog-header"><div><span class="djog-kicker">CONFIGURATION</span><h1>Protection settings</h1><p>Configure rules without editing theme or checkout code.</p></div><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=djog-dashboard' ) ); ?>">View dashboard</a></div>
         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="djog-settings-form"><input type="hidden" name="action" value="djog_save_settings"><?php wp_nonce_field( 'djog_save_settings' ); ?>
-        <div class="djog-grid"><div class="djog-panel"><h2>Core protection</h2><label class="djog-toggle"><input type="checkbox" name="enabled" value="yes" <?php checked( $s['enabled'], 'yes' ); ?>><span>Enable checkout protection</span></label><label class="djog-toggle"><input type="checkbox" name="validate_mobile" value="yes" <?php checked( $s['validate_mobile'], 'yes' ); ?>><span>Require valid Bangladeshi mobile format</span></label><label class="djog-field">Block window (minutes)<input type="number" name="window_minutes" min="1" max="10080" value="<?php echo esc_attr( $s['window_minutes'] ); ?>"><small>Orders within this period are checked against the same customer signals.</small></label><label class="djog-field">Maximum matching orders<input type="number" name="max_orders" min="1" max="20" value="<?php echo esc_attr( $s['max_orders'] ); ?>"><small>Number of recent orders that triggers protection.</small></label><fieldset><legend>Signals to check</legend><label><input type="checkbox" name="check_phone" value="yes" <?php checked( $s['check_phone'], 'yes' ); ?>> Phone</label><label><input type="checkbox" name="check_email" value="yes" <?php checked( $s['check_email'], 'yes' ); ?>> Email</label><label><input type="checkbox" name="check_ip" value="yes" <?php checked( $s['check_ip'], 'yes' ); ?>> IP address</label></fieldset><fieldset><legend>Order statuses counted</legend><?php foreach ( [ 'pending', 'processing', 'on-hold', 'completed', 'cancelled' ] as $status ) : ?><label><input type="checkbox" name="statuses[]" value="<?php echo esc_attr( $status ); ?>" <?php checked( in_array( $status, (array) $s['statuses'], true ) ); ?>> <?php echo esc_html( ucfirst( $status ) ); ?></label><?php endforeach; ?></fieldset></div>
-        <div class="djog-panel"><h2>Trusted customers</h2><label class="djog-field">Whitelisted phone numbers<textarea name="whitelist_phones" rows="6" placeholder="One number per line"><?php echo esc_textarea( $s['whitelist_phones'] ); ?></textarea><small>Accepted formats are normalized automatically, including +8801XXXXXXXXX.</small></label><label class="djog-field">Whitelisted email addresses<textarea name="whitelist_emails" rows="6" placeholder="One email per line"><?php echo esc_textarea( $s['whitelist_emails'] ); ?></textarea></label><h2>Customer messages</h2><label class="djog-field">Duplicate/fake order message<textarea name="error_message" rows="5"><?php echo esc_textarea( $s['error_message'] ); ?></textarea><small>Placeholders: {{window}}, {{reason}}, {{phone}}</small></label><label class="djog-field">Invalid phone message<textarea name="invalid_phone_message" rows="4"><?php echo esc_textarea( $s['invalid_phone_message'] ); ?></textarea></label><div class="djog-preview"><strong>Live preview</strong><div class="djog-checkout-error"><span class="djog-checkout-error__icon">🛡</span><span id="djog-preview-text"><?php echo esc_html( $s['error_message'] ); ?></span></div></div></div></div>
-        <div class="djog-panel"><h2>Message appearance</h2><div class="djog-fields-row"><label class="djog-field">Text color<input type="color" name="text_color" value="<?php echo esc_attr( $s['text_color'] ); ?>"></label><label class="djog-field">Background<input type="color" name="background_color" value="<?php echo esc_attr( $s['background_color'] ); ?>"></label><label class="djog-field">Border<input type="color" name="border_color" value="<?php echo esc_attr( $s['border_color'] ); ?>"></label><label class="djog-field">Radius (px)<input type="number" name="border_radius" min="0" max="32" value="<?php echo esc_attr( $s['border_radius'] ); ?>"></label><label class="djog-field">Font size (px)<input type="number" name="font_size" min="12" max="24" value="<?php echo esc_attr( $s['font_size'] ); ?>"></label></div></div><p><button class="button button-primary button-large" type="submit">Save protection settings</button></p></form><p class="djog-footer">Developer: <strong>Joynal Abdin</strong> · <a href="https://devjoynal.com" target="_blank" rel="noopener">DevJoynal</a></p></div>
+        <div class="djog-grid"><div class="djog-panel"><h2>Core protection</h2><label class="djog-toggle"><input type="checkbox" name="enabled" value="yes" <?php checked( $s['enabled'], 'yes' ); ?>><span>Enable checkout protection</span></label><label class="djog-toggle"><input type="checkbox" name="validate_mobile" value="yes" <?php checked( $s['validate_mobile'], 'yes' ); ?>><span>Require valid Bangladeshi mobile format</span></label><label class="djog-field">Block window (minutes)<input type="number" name="window_minutes" min="1" max="10080" value="<?php echo esc_attr( $s['window_minutes'] ); ?>"><small>Orders within this period are checked against the same customer signals.</small></label><label class="djog-field">Maximum matching orders<input type="number" name="max_orders" min="1" max="20" value="<?php echo esc_attr( $s['max_orders'] ); ?>"><small>Number of recent orders that triggers protection.</small></label><label class="djog-field">Blocked retry cooldown (seconds)<input type="number" name="blocked_retry_cooldown" min="0" max="3600" value="<?php echo esc_attr( $s['blocked_retry_cooldown'] ); ?>"><small>Temporarily slows repeated blocked checkout attempts from the same signals.</small></label><fieldset><legend>Signals to check</legend><label><input type="checkbox" name="check_phone" value="yes" <?php checked( $s['check_phone'], 'yes' ); ?>> Phone</label><label><input type="checkbox" name="check_email" value="yes" <?php checked( $s['check_email'], 'yes' ); ?>> Email</label><label><input type="checkbox" name="check_ip" value="yes" <?php checked( $s['check_ip'], 'yes' ); ?>> IP address</label></fieldset><fieldset><legend>Order statuses counted</legend><?php foreach ( [ 'pending', 'processing', 'on-hold', 'completed', 'cancelled' ] as $status ) : ?><label><input type="checkbox" name="statuses[]" value="<?php echo esc_attr( $status ); ?>" <?php checked( in_array( $status, (array) $s['statuses'], true ) ); ?>> <?php echo esc_html( ucfirst( $status ) ); ?></label><?php endforeach; ?></fieldset></div>
+        <div class="djog-panel"><h2>Trusted customers</h2><label class="djog-field">Whitelisted phone numbers<textarea name="whitelist_phones" rows="6" placeholder="One number per line"><?php echo esc_textarea( $s['whitelist_phones'] ); ?></textarea><small>Accepted formats are normalized automatically, including +8801XXXXXXXXX.</small></label><label class="djog-field">Whitelisted email addresses<textarea name="whitelist_emails" rows="6" placeholder="One email per line"><?php echo esc_textarea( $s['whitelist_emails'] ); ?></textarea></label><label class="djog-field">Excluded product IDs<textarea name="excluded_product_ids" rows="4" placeholder="101, 202 or one ID per line"><?php echo esc_textarea( $s['excluded_product_ids'] ); ?></textarea><small>Products listed here are hidden from catalog visibility and blocked from checkout.</small></label><h2>Customer messages</h2><label class="djog-field">Duplicate/fake order message<textarea name="error_message" rows="5"><?php echo esc_textarea( $s['error_message'] ); ?></textarea><small>Placeholders: {{window}}, {{reason}}, {{phone}}</small></label><label class="djog-field">Invalid phone message<textarea name="invalid_phone_message" rows="4"><?php echo esc_textarea( $s['invalid_phone_message'] ); ?></textarea></label><div class="djog-preview"><strong>Live preview</strong><div class="djog-checkout-error"><span class="djog-checkout-error__icon">🛡</span><span id="djog-preview-text"><?php echo esc_html( $s['error_message'] ); ?></span></div></div></div></div>
+        <div class="djog-panel"><h2>Message appearance</h2><div class="djog-fields-row"><label class="djog-field">Text color<input type="color" name="text_color" value="<?php echo esc_attr( $s['text_color'] ); ?>"></label><label class="djog-field">Background<input type="color" name="background_color" value="<?php echo esc_attr( $s['background_color'] ); ?>"></label><label class="djog-field">Border<input type="color" name="border_color" value="<?php echo esc_attr( $s['border_color'] ); ?>"></label><label class="djog-field">Radius (px)<input type="number" name="border_radius" min="0" max="32" value="<?php echo esc_attr( $s['border_radius'] ); ?>"></label><label class="djog-field">Font size (px)<input type="number" name="font_size" min="12" max="24" value="<?php echo esc_attr( $s['font_size'] ); ?>"></label><label class="djog-field">Log retention (days)<input type="number" name="log_retention_days" min="1" max="3650" value="<?php echo esc_attr( $s['log_retention_days'] ); ?>"><small>Old masked security logs are removed by the daily cleanup task.</small></label></div></div><p><button class="button button-primary button-large" type="submit">Save protection settings</button></p></form><p class="djog-footer">Developer: <strong>Joynal Abdin</strong> · <a href="https://devjoynal.com" target="_blank" rel="noopener">DevJoynal</a></p></div>
         <?php
     }
 
@@ -472,9 +540,11 @@ final class DevJoynal_Woo_Order_Guard {
             'check_ip' => isset( $raw['check_ip'] ) ? 'yes' : 'no',
             'window_minutes' => max( 1, min( 10080, absint( $raw['window_minutes'] ?? $defaults['window_minutes'] ) ) ),
             'max_orders' => max( 1, min( 20, absint( $raw['max_orders'] ?? $defaults['max_orders'] ) ) ),
+            'blocked_retry_cooldown' => max( 0, min( 3600, absint( $raw['blocked_retry_cooldown'] ?? $defaults['blocked_retry_cooldown'] ) ) ),
             'statuses' => array_values( array_intersect( [ 'pending', 'processing', 'on-hold', 'completed', 'cancelled' ], array_map( 'sanitize_key', (array) ( $raw['statuses'] ?? [] ) ) ) ),
             'whitelist_phones' => sanitize_textarea_field( $raw['whitelist_phones'] ?? '' ),
             'whitelist_emails' => sanitize_textarea_field( strtolower( (string) ( $raw['whitelist_emails'] ?? '' ) ) ),
+            'excluded_product_ids' => preg_replace( '/[^0-9,\\s]/', '', (string) ( $raw['excluded_product_ids'] ?? '' ) ),
             'error_message' => wp_kses_post( $raw['error_message'] ?? $defaults['error_message'] ),
             'invalid_phone_message' => wp_kses_post( $raw['invalid_phone_message'] ?? $defaults['invalid_phone_message'] ),
             'icon' => 'shield',
@@ -483,7 +553,7 @@ final class DevJoynal_Woo_Order_Guard {
             'border_color' => sanitize_hex_color( $raw['border_color'] ?? '' ) ?: $defaults['border_color'],
             'border_radius' => max( 0, min( 32, absint( $raw['border_radius'] ?? $defaults['border_radius'] ) ) ),
             'font_size' => max( 12, min( 24, absint( $raw['font_size'] ?? $defaults['font_size'] ) ) ),
-            'log_retention_days' => 90,
+            'log_retention_days' => max( 1, min( 3650, absint( $raw['log_retention_days'] ?? $defaults['log_retention_days'] ) ) ),
         ];
         update_option( $this->option, $clean, false );
         wp_safe_redirect( add_query_arg( [ 'page' => 'djog-settings', 'updated' => '1' ], admin_url( 'admin.php' ) ) );

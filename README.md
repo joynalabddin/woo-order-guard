@@ -7,6 +7,10 @@
 **Website:** [devjoynal.com](https://devjoynal.com)
 
 > বর্তমান release: **1.3.2**। এই repository-তে plugin code, documentation, security policy এবং independent seller licensing client অন্তর্ভুক্ত আছে।
+>
+> **WooCommerce duplicate order protection plugin for Bangladesh COD stores:** phone validation, fake-order prevention, repeat-order controls, whitelist, masked security logs, Classic Checkout, Block Checkout এবং HPOS support।
+
+[Download the latest plugin ZIP](https://github.com/joynalabddin/woo-order-guard/releases/latest) · [Report a security issue](https://github.com/joynalabddin/woo-order-guard/security/advisories/new)
 
 ## সূচিপত্র
 
@@ -24,6 +28,10 @@
 | [Troubleshooting](#troubleshooting) | সাধারণ সমস্যা ও সমাধান |
 | [Release history](#release-history) | version-by-version পরিবর্তন |
 | [Documentation map](#documentation-map) | বিস্তারিত GitHub documents |
+
+## Public download ও support
+
+এই project-এর public source, release ZIP এবং documentation GitHub-এ পাওয়া যাবে। Search engine ও store owner যেন project-এর purpose সহজে বুঝতে পারে, তাই feature description, compatibility baseline, installation steps, live checkout behavior এবং licensing policy আলাদা section-এ রাখা হয়েছে। Latest stable ZIP পেতে [GitHub Releases](https://github.com/joynalabddin/woo-order-guard/releases) দেখুন।
 
 ## Documentation map
 

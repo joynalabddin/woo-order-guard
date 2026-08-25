@@ -2,6 +2,11 @@
 
 এই project-এর গুরুত্বপূর্ণ পরিবর্তনগুলো এখানে সংরক্ষিত হয়। Versioning semantic release style অনুসরণ করে।
 
+## [1.3.1] — License screen stability
+
+- Empty license state-এ undefined array key warning fix করা হয়েছে।
+- Free/Demo screen-এর safe defaults এবং status rendering উন্নত করা হয়েছে।
+
 ## [1.3.0] — Flexible independent licensing
 
 - License key ছাড়াই local Free/Demo mode activation যোগ করা হয়েছে।

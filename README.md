@@ -6,7 +6,7 @@
 **Repository:** [github.com/joynalabddin/woo-order-guard](https://github.com/joynalabddin/woo-order-guard)<br>
 **Website:** [devjoynal.com](https://devjoynal.com)
 
-> বর্তমান release: **1.3.0**। এই repository-তে plugin code, documentation, security policy এবং independent seller licensing client অন্তর্ভুক্ত আছে।
+> বর্তমান release: **1.3.1**। এই repository-তে plugin code, documentation, security policy এবং independent seller licensing client অন্তর্ভুক্ত আছে।
 
 ## সূচিপত্র
 

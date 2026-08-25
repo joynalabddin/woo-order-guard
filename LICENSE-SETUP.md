@@ -1,6 +1,6 @@
 # Independent license management setup
 
-WooCommerce Order Guard Envato-এর বাইরে বিক্রির জন্য দুইটি operating mode সমর্থন করে:
+WooCommerce Order Guard independent seller distribution-এর জন্য দুইটি operating mode সমর্থন করে:
 
 | Mode | License key | Intended use |
 |---|---|---|
@@ -61,7 +61,7 @@ Seller endpoint-টি JSON `POST` request গ্রহণ করবে। Reque
   "license_key": "WOG-7F4K-9Q2M-X8PA-3R6T",
   "domain": "customer.example.com",
   "site_url": "https://customer.example.com/",
-  "plugin_version": "1.3.0",
+  "plugin_version": "1.3.1",
   "wordpress_version": "7.1",
   "woocommerce_version": "11.0.1"
 }
@@ -120,7 +120,7 @@ Lifetime key মানে expiry date থাকবে না; এটি unlimite
 
 ## Security boundary
 
-Seller secret, signing secret, database credential এবং production key database কখনো WordPress plugin ZIP বা GitHub repository-তে রাখবেন না। Plugin customer-side client; purchase validity এবং activation policy-এর source of truth হলো seller server। API-তে HTTPS, request authentication, rate limiting, bounded response, audit logging এবং replay protection ব্যবহার করুন।
+Seller secret, signing secret, database credential এবং production key database কখনো WordPress plugin ZIP বা GitHub repository-তে রাখবেন না। Plugin customer-side client; product-key validity এবং activation policy-এর source of truth হলো seller server। API-তে HTTPS, request authentication, rate limiting, bounded response, audit logging এবং replay protection ব্যবহার করুন।
 
 ## Migration and reset policy
 

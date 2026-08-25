@@ -34,7 +34,7 @@ Dashboard-এর **Total blocked** সব masked event-এর সংখ্যা
 
 ## License modes
 
-Pluginটি Envato-এর বাইরে direct sales বা agency sales-এর জন্য দুইটি mode দেয়। **Free/Demo mode**-এ কোনো license key লাগে না; official site, development বা demo store-এ **Order Guard → License → Use Free/Demo mode** চাপুন।
+Pluginটি direct sales বা agency sales-এর জন্য দুইটি mode দেয়। **Free/Demo mode**-এ কোনো license key লাগে না; official site, development বা demo store-এ **Order Guard → License → Use Free/Demo mode** চাপুন।
 
 **Paid mode**-এ আপনার seller license server থেকে issue করা product key লাগে। Customer **Order Guard → License** খুলে key paste করে **Activate paid license** চাপবে। Product key encrypted local option-এ রাখা হয় এবং seller API current domain, product ID ও plan/expiry অনুযায়ী activation status ফেরত দেয়।
 

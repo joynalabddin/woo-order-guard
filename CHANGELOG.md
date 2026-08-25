@@ -2,6 +2,12 @@
 
 এই project-এর গুরুত্বপূর্ণ পরিবর্তনগুলো এখানে সংরক্ষিত হয়। Versioning semantic release style অনুসরণ করে।
 
+## [1.3.2] — Independent key naming cleanup
+
+- Internal `purchase_code` naming-কে `license_key` করা হয়েছে।
+- নতুন activation state-এ `encrypted_license_key` ব্যবহৃত হচ্ছে; পুরনো stored state backward-compatible রাখা হয়েছে।
+- Paid service configuration check এখন সরাসরি `DJOG_LICENSE_PRODUCT_ID` ব্যবহার করে।
+
 ## [1.3.1] — License screen stability
 
 - Empty license state-এ undefined array key warning fix করা হয়েছে।
@@ -18,7 +24,7 @@
 
 - Customer-side paid product-key license UI যোগ করা হয়েছে।
 - Activation, status refresh এবং site deactivation action যোগ হয়েছে।
-- Current domain, product ID, item ID এবং plugin version seller service-এ পাঠানোর contract যুক্ত হয়েছে।
+- Current domain, product ID এবং plugin version seller service-এ পাঠানোর contract যুক্ত হয়েছে।
 - Product key local option-এ encrypted অবস্থায় রাখা হয়েছে; raw key admin screen-এ দেখানো হয় না।
 - Remote service outage-এর জন্য 14-day active grace period যুক্ত হয়েছে।
 - Daily license status check এবং license-required enforcement flag যুক্ত হয়েছে।

@@ -1,12 +1,12 @@
 # WooCommerce Order Guard by DevJoynal
 
-**WooCommerce Order Guard** হলো WooCommerce store-এর জন্য তৈরি privacy-conscious fake order, duplicate order, rapid retry এবং customer-signal protection plugin। এটি বিশেষভাবে Bangladesh-focused COD store-এর জন্য phone normalization ও Bangladeshi mobile validation সমর্থন করে, আবার modern WooCommerce classic checkout, Block Checkout এবং HPOS workflow-এর সঙ্গেও কাজ করার জন্য তৈরি। Pluginটি Envato-এর বাইরে বিক্রির জন্য **Free/Demo mode** এবং seller-issued **Paid product-key mode**—দুইটিই সমর্থন করে।
+**WooCommerce Order Guard** হলো WooCommerce store-এর জন্য তৈরি privacy-conscious fake order, duplicate order, rapid retry এবং customer-signal protection plugin। এটি বিশেষভাবে Bangladesh-focused COD store-এর জন্য phone normalization ও Bangladeshi mobile validation সমর্থন করে, আবার modern WooCommerce classic checkout, Block Checkout এবং HPOS workflow-এর সঙ্গেও কাজ করার জন্য তৈরি। Pluginটি independent direct sales-এর জন্য **Free/Demo mode** এবং seller-issued **Paid product-key mode**—দুইটিই সমর্থন করে।
 
 **Developer:** Joynal Abdin · **Brand:** DevJoynal<br>
 **Repository:** [github.com/joynalabddin/woo-order-guard](https://github.com/joynalabddin/woo-order-guard)<br>
 **Website:** [devjoynal.com](https://devjoynal.com)
 
-> বর্তমান release: **1.3.1**। এই repository-তে plugin code, documentation, security policy এবং independent seller licensing client অন্তর্ভুক্ত আছে।
+> বর্তমান release: **1.3.2**। এই repository-তে plugin code, documentation, security policy এবং independent seller licensing client অন্তর্ভুক্ত আছে।
 
 ## সূচিপত্র
 
@@ -32,7 +32,7 @@
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | Store owner ও admin-এর Bengali operations guide |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime flow, storage model, hooks ও licensing boundary |
 | [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) | Coding rules, testing, release ও contributor workflow |
-| [LICENSE-SETUP.md](LICENSE-SETUP.md) | Envato/CodeCanyon license API setup ও seller contract |
+| [LICENSE-SETUP.md](LICENSE-SETUP.md) | Independent seller license API setup ও seller contract |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting, secrets ও security design |
 | [CHANGELOG.md](CHANGELOG.md) | Release-by-release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Pull request ও contribution standard |
@@ -132,7 +132,7 @@ Customer message-এ ব্যবহারযোগ্য placeholder হলো 
 
 ## License activation
 
-Envato-এর বাইরে direct sales, agency sales বা আপনার own website-এর মাধ্যমে বিক্রির জন্য plugin-এ independent license manager রয়েছে। এতে **Free/Demo mode**-এ কোনো license key ছাড়াই plugin চালানো যায় এবং **Paid mode**-এ seller-issued product key দিয়ে domain-bound activation করা যায়।
+Direct sales, agency sales বা আপনার own website-এর মাধ্যমে বিক্রির জন্য plugin-এ independent license manager রয়েছে। এতে **Free/Demo mode**-এ কোনো license key ছাড়াই plugin চালানো যায় এবং **Paid mode**-এ seller-issued product key দিয়ে domain-bound activation করা যায়।
 
 ### License ছাড়া activation
 
@@ -168,7 +168,7 @@ Seller API-কে product key hash যাচাই করতে হবে, produ
 
 Plugin-এর security model কয়েকটি স্তরে কাজ করে। Admin actions capability check এবং WordPress nonce দিয়ে protected। Database write WordPress API বা `$wpdb->prepare()` ব্যবহার করে। Customer-facing output escaped। Logs-এ phone, email ও IPv4 masked অবস্থায় থাকে। Daily retention cleanup পুরোনো log সরায়। Privacy exporter ও eraser integration WordPress Privacy Tools-এর সঙ্গে যুক্ত।
 
-License client-এ seller secret plugin-এর বাইরে থাকে। Local purchase code AES-256-CBC encryption-এ site salts ও site URL-derived key দিয়ে সংরক্ষণ করা হয়; activation state-এর সঙ্গে one-way HMAC hash-ও রাখা হয়। Remote license outage-এর সময় checkout-এ live remote dependency তৈরি না করে cached active grace period ব্যবহার করা হয়।
+License client-এ seller secret plugin-এর বাইরে থাকে। Local product key AES-256-CBC encryption-এ site salts ও site URL-derived key দিয়ে সংরক্ষণ করা হয়; activation state-এর সঙ্গে one-way HMAC hash-ও রাখা হয়। Remote license outage-এর সময় checkout-এ live remote dependency তৈরি না করে cached active grace period ব্যবহার করা হয়।
 
 ## Developer guide
 
@@ -217,7 +217,7 @@ node --check assets/frontend.js
 git diff --check
 ```
 
-Production ZIP তৈরি করার সময় `.git` directory বাদ দিতে হবে। কোনো Envato token, API secret, real purchase code, customer export বা site credential commit করা যাবে না।
+Production ZIP তৈরি করার সময় `.git` directory বাদ দিতে হবে। কোনো seller token, API secret, real product key, customer export বা site credential commit করা যাবে না।
 
 ## Troubleshooting
 

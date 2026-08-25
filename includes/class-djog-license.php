@@ -76,10 +76,10 @@ final class DevJoynal_DJOG_License {
                     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                         <input type="hidden" name="action" value="djog_activate_license">
                         <?php wp_nonce_field( 'djog_activate_license' ); ?>
-                        <label class="djog-field">Product license key<input type="password" name="purchase_code" autocomplete="off" required placeholder="XXXX-XXXX-XXXX-XXXX"></label>
+                        <label class="djog-field">Product license key<input type="password" name="license_key" autocomplete="off" required placeholder="XXXX-XXXX-XXXX-XXXX"></label>
                         <button class="button button-primary button-large" type="submit" <?php disabled( ! $configured ); ?>>Activate paid license</button>
                     </form>
-                    <?php if ( ! $free_mode && $this->has_purchase_code() ) : ?>
+                    <?php if ( ! $free_mode && $this->has_license_key() ) : ?>
                         <div class="djog-license-actions"><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_refresh_license' ), 'djog_refresh_license' ) ); ?>">Refresh status</a> <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=djog_deactivate_license' ), 'djog_deactivate_license' ) ); ?>" onclick="return confirm('Deactivate this site license?');">Deactivate site</a></div>
                     <?php endif; ?>
                     <div class="djog-license-actions"><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="djog_enable_free_mode"><?php wp_nonce_field( 'djog_enable_free_mode' ); ?><button class="button" type="submit">Use Free/Demo mode</button></form></div>
@@ -99,17 +99,17 @@ final class DevJoynal_DJOG_License {
 
     public function activate_license(): void {
         $this->guard_request( 'djog_activate_license' );
-        $purchase_code = sanitize_text_field( wp_unslash( $_POST['purchase_code'] ?? '' ) );
-        if ( ! preg_match( '/^[a-z0-9-]{8,128}$/i', $purchase_code ) ) {
+        $license_key = sanitize_text_field( wp_unslash( $_POST['license_key'] ?? '' ) );
+        if ( ! preg_match( '/^[a-z0-9-]{8,128}$/i', $license_key ) ) {
             $this->redirect( 'Enter a valid product license key.', 'error' );
         }
-        $result = $this->request( 'activate', $purchase_code );
+        $result = $this->request( 'activate', $license_key );
         $this->redirect( $result['message'], $result['success'] ? 'success' : 'error' );
     }
 
     public function enable_free_mode(): void {
         $this->guard_request( 'djog_enable_free_mode' );
-        $current_key = $this->decrypt( (string) ( $this->state()['encrypted_purchase_code'] ?? '' ) );
+        $current_key = $this->stored_license_key();
         if ( $current_key !== '' && $this->configured() ) {
             $this->request( 'deactivate', $current_key );
         }
@@ -120,6 +120,7 @@ final class DevJoynal_DJOG_License {
             'domain' => $this->domain(),
             'last_checked' => current_time( 'mysql', true ),
             'expires_at' => '',
+            'encrypted_license_key' => '',
             'encrypted_purchase_code' => '',
             'license_hash' => '',
         ] );
@@ -128,9 +129,9 @@ final class DevJoynal_DJOG_License {
 
     public function deactivate_license(): void {
         $this->guard_request( 'djog_deactivate_license' );
-        $purchase_code = $this->decrypt( (string) ( $this->state()['encrypted_purchase_code'] ?? '' ) );
-        if ( $purchase_code !== '' && $this->configured() ) {
-            $this->request( 'deactivate', $purchase_code );
+        $license_key = $this->stored_license_key();
+        if ( $license_key !== '' && $this->configured() ) {
+            $this->request( 'deactivate', $license_key );
         }
         delete_option( $this->option );
         $this->redirect( 'This site license has been deactivated.', 'success' );
@@ -138,19 +139,19 @@ final class DevJoynal_DJOG_License {
 
     public function refresh_license(): void {
         $this->guard_request( 'djog_refresh_license' );
-        $purchase_code = $this->decrypt( (string) ( $this->state()['encrypted_purchase_code'] ?? '' ) );
-        $result = $purchase_code !== '' ? $this->request( 'check', $purchase_code ) : [ 'success' => false, 'message' => 'No purchase code is stored on this site.' ];
+        $license_key = $this->stored_license_key();
+        $result = $license_key !== '' ? $this->request( 'check', $license_key ) : [ 'success' => false, 'message' => 'No product key is stored on this site.' ];
         $this->redirect( $result['message'], $result['success'] ? 'success' : 'error' );
     }
 
     public function scheduled_check(): void {
-        $purchase_code = $this->decrypt( (string) ( $this->state()['encrypted_purchase_code'] ?? '' ) );
-        if ( $purchase_code !== '' && $this->configured() ) {
-            $this->request( 'check', $purchase_code );
+        $license_key = $this->stored_license_key();
+        if ( $license_key !== '' && $this->configured() ) {
+            $this->request( 'check', $license_key );
         }
     }
 
-    private function request( string $action, string $purchase_code ): array {
+    private function request( string $action, string $license_key ): array {
         if ( ! $this->configured() ) {
             return [ 'success' => false, 'message' => 'License service is not configured.' ];
         }
@@ -161,7 +162,7 @@ final class DevJoynal_DJOG_License {
                 'api_version' => '1',
                 'action' => $action,
                 'product_id' => DJOG_LICENSE_PRODUCT_ID,
-                'license_key' => $purchase_code,
+                'license_key' => $license_key,
                 'domain' => $this->domain(),
                 'site_url' => home_url( '/' ),
                 'plugin_version' => DJOG_VERSION,
@@ -195,8 +196,9 @@ final class DevJoynal_DJOG_License {
             'activation_limit' => absint( $data['activation_limit'] ?? 0 ),
             'activations_used' => absint( $data['activations_used'] ?? 0 ),
             'grace_until' => time() + ( 14 * DAY_IN_SECONDS ),
-            'encrypted_purchase_code' => $this->encrypt( $purchase_code ),
-            'license_hash' => hash_hmac( 'sha256', $purchase_code, wp_salt( 'auth' ) ),
+            'encrypted_license_key' => $this->encrypt( $license_key ),
+            'encrypted_purchase_code' => '',
+            'license_hash' => hash_hmac( 'sha256', $license_key, wp_salt( 'auth' ) ),
         ];
         $this->update_state( $state );
         return [ 'success' => true, 'message' => $state['message'] ];
@@ -215,7 +217,7 @@ final class DevJoynal_DJOG_License {
     }
 
     private function configured(): bool {
-        return DJOG_LICENSE_API_URL !== '' && DJOG_LICENSE_ITEM_ID !== '';
+        return DJOG_LICENSE_API_URL !== '' && DJOG_LICENSE_PRODUCT_ID !== '';
     }
 
     private function state(): array {
@@ -227,8 +229,14 @@ final class DevJoynal_DJOG_License {
         update_option( $this->option, array_merge( $this->state(), $changes ), false );
     }
 
-    private function has_purchase_code(): bool {
-        return $this->decrypt( (string) ( $this->state()['encrypted_purchase_code'] ?? '' ) ) !== '';
+    private function stored_license_key(): string {
+        $state = $this->state();
+        $encrypted = (string) ( $state['encrypted_license_key'] ?? $state['encrypted_purchase_code'] ?? '' );
+        return $this->decrypt( $encrypted );
+    }
+
+    private function has_license_key(): bool {
+        return $this->stored_license_key() !== '';
     }
 
     public function is_active(): bool {
